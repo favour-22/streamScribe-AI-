@@ -1,0 +1,8 @@
+{
+  "name": "StreamScribe AI",
+  "description": "An advanced AI application that transcribes live audio streams, analyzes video content for key insights, and offers flexible pricing plans. Harness the power of Gemini for seamless media understanding.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
