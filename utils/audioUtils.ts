@@ -1,5 +1,7 @@
 // These functions are for handling raw audio data for the Gemini Live API.
 
+const TARGET_SAMPLE_RATE = 16000;
+
 /**
  * Encodes raw audio bytes into a base64 string.
  * @param bytes The Uint8Array containing audio data.
@@ -55,4 +57,41 @@ export async function decodeAudioData(
     }
   }
   return buffer;
+}
+
+/**
+ * Processes a video file to extract, decode, and resample its audio track for transcription.
+ * @param file The video file.
+ * @returns A promise that resolves to a Float32Array of the raw audio data, resampled to 16kHz mono.
+ */
+export async function processVideoFileForTranscription(file: File): Promise<Float32Array> {
+  // Use `any` cast for webkitAudioContext compatibility
+  const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const fileBuffer = await file.arrayBuffer();
+  
+  // This will throw a descriptive error if the file format is not supported
+  const decodedBuffer = await audioContext.decodeAudioData(fileBuffer);
+
+  // If the audio is already at the target sample rate and mono, we can skip resampling.
+  if (decodedBuffer.sampleRate === TARGET_SAMPLE_RATE && decodedBuffer.numberOfChannels === 1) {
+    await audioContext.close();
+    return decodedBuffer.getChannelData(0);
+  }
+
+  // Use an OfflineAudioContext to resample the audio to 16kHz mono.
+  const offlineContext = new OfflineAudioContext(
+    1, // 1 channel (mono)
+    Math.ceil(decodedBuffer.duration * TARGET_SAMPLE_RATE), // total number of samples in the new buffer
+    TARGET_SAMPLE_RATE // target sample rate
+  );
+
+  const source = offlineContext.createBufferSource();
+  source.buffer = decodedBuffer;
+  source.connect(offlineContext.destination);
+  source.start();
+
+  const resampledBuffer = await offlineContext.startRendering();
+  await audioContext.close();
+  
+  return resampledBuffer.getChannelData(0);
 }
